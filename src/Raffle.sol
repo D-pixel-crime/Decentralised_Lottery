@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {AggregatorV3Interface} from "chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {VRFConsumerBaseV2Plus} from "chainlink-vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "chainlink-vrf/dev/libraries/VRFV2PlusClient.sol";
+import {ReentrancyGuard} from "reentrancy-gaurd/ReentrancyGuard.sol";
 
 library math {
     function convertEthToDollars(
@@ -24,8 +25,13 @@ library math {
  * @notice This contract randomly selects participants of a lottery.
  * @dev Implements Chainlink VRF@2.5
  */
-contract Raffle is VRFConsumerBaseV2Plus {
+contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
     using math for uint256;
+
+    enum RaffleState {
+        IDLE,
+        BUSY
+    }
 
     address private constant VRF_COORDINATOR =
         0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B;
@@ -33,14 +39,14 @@ contract Raffle is VRFConsumerBaseV2Plus {
     uint256 private immutable i_entranceFee;
     address private immutable i_owner;
     uint256 private immutable i_cooldownPeriod;
-    bytes32 public s_keyHash =
-        0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
-    uint32 public s_callbackGasLimit = 40_000;
-    uint16 public s_requestConfirmations = 3;
+    bytes32 public s_keyHash;
+    uint32 public s_callbackGasLimit;
+    uint16 public s_requestConfirmations;
     address payable[] private s_players;
     uint256 private s_lastTimestamp;
     uint256 private s_subscriptionId;
-    AggregatorV3Interface private s_proxy;
+    AggregatorV3Interface public s_proxy;
+    RaffleState private s_currRaffleState;
 
     // Events
     event newPlayerAdded(address, address);
@@ -54,22 +60,35 @@ contract Raffle is VRFConsumerBaseV2Plus {
     error rewardErrorForWinner(address, address);
     error notEnoughEntranceFee(address, uint256, uint256);
     error cooldownInEffect(address, uint256, uint256);
+    error lotterySystemBusy(address, uint256);
     error notInAllowedConfirmationsLimitsOf_3_and_200(address, uint256);
     error aboveAllowedGasLimitOf_2_500_000(address, uint256);
 
     constructor(
         uint256 entranceFee,
         uint256 cooldownPeriod,
+        bytes32 keyHash,
+        uint32 callbackGasLimit,
+        uint16 requestConfirmations,
+        uint256 subscriptionId,
         AggregatorV3Interface proxy
     ) VRFConsumerBaseV2Plus(VRF_COORDINATOR) {
         i_owner = msg.sender;
         i_entranceFee = entranceFee;
         i_cooldownPeriod = cooldownPeriod;
+        s_keyHash = keyHash;
+        s_callbackGasLimit = callbackGasLimit;
+        s_requestConfirmations = requestConfirmations;
+        s_subscriptionId = subscriptionId;
         s_proxy = proxy;
         s_lastTimestamp = block.timestamp;
+        s_currRaffleState = RaffleState.IDLE;
     }
 
     function enterRaffle() public payable {
+        if (s_currRaffleState != RaffleState.IDLE) {
+            revert lotterySystemBusy(address(this), block.timestamp);
+        }
         uint256 convertedVal = msg.value.convertEthToDollars(s_proxy);
         if (convertedVal < i_entranceFee) {
             revert notEnoughEntranceFee(
@@ -83,6 +102,9 @@ contract Raffle is VRFConsumerBaseV2Plus {
     }
 
     function pickWinner() public returns (uint256 requestId) {
+        if (s_currRaffleState != RaffleState.IDLE) {
+            revert lotterySystemBusy(address(this), block.timestamp);
+        }
         if (block.timestamp - s_lastTimestamp < i_cooldownPeriod) {
             revert cooldownInEffect(
                 address(this),
@@ -90,6 +112,12 @@ contract Raffle is VRFConsumerBaseV2Plus {
                 s_lastTimestamp
             );
         }
+        if (s_players.length == 0) {
+            revert noPlayers(address(this));
+        }
+
+        s_currRaffleState = RaffleState.BUSY;
+
         requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
                 keyHash: s_keyHash,
@@ -108,27 +136,31 @@ contract Raffle is VRFConsumerBaseV2Plus {
     function fulfillRandomWords(
         uint256 requestId,
         uint256[] calldata randomWords
-    ) internal override {
+    ) internal override nonReentrant {
         uint256 len = s_players.length;
-        if (len == 0) {
-            revert noPlayers(address(this));
+        if (s_currRaffleState == RaffleState.BUSY) {
+            revert lotterySystemBusy(address(this), block.timestamp);
         }
 
         address payable winner = s_players[randomWords[0] % len];
         uint256 winningAmount = address(this).balance;
+
+        s_players = new address payable[](0);
+        s_lastTimestamp = block.timestamp;
+
         (bool success, ) = winner.call{value: address(this).balance}("");
         if (!success) {
             revert rewardErrorForWinner(address(this), address(winner));
         }
 
-        s_players = new address payable[](0);
-        s_lastTimestamp = block.timestamp;
         emit newWinnerRewarded(
             address(this),
             address(winner),
             winningAmount,
             s_lastTimestamp
         );
+
+        s_currRaffleState = RaffleState.IDLE;
     }
 
     /**

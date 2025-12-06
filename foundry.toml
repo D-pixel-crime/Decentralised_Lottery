@@ -7,6 +7,7 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
     "chainlink/=lib/chainlink-brownie-contracts/",
     "chainlink-vrf/=lib/chainlink-brownie-contracts/contracts/src/v0.8/vrf/",
+    "reentrancy-gaurd=lib/openzeppelin-contracts/contracts/utils/",
 ]
 
 [lint]
