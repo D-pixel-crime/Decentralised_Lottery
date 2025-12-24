@@ -40,8 +40,8 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
     error rewardErrorForWinner(address, address);
     error notEnoughEntranceFee(address, uint256, uint256);
     error lotterySystemBusy(address, uint256);
-    error notInAllowedConfirmationsLimitsOf_3_and_200(address, uint256);
-    error aboveAllowedGasLimitOf_2_500_000(address, uint256);
+    error notInAllowedConfirmationsLimitsOf_3_and_200(address, uint16);
+    error aboveAllowedGasLimitOf_2_500_000(address, uint32);
 
     // Events
     event newPlayerAdded(address, address);
@@ -213,5 +213,13 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
         returns (uint256, uint256)
     {
         return (s_players.length, address(this).balance);
+    }
+
+    function getRaffleState() public view returns (RaffleState) {
+        return s_currRaffleState;
+    }
+
+    function getOwner() public view returns (address) {
+        return i_owner;
     }
 }

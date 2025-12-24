@@ -28,6 +28,7 @@ contract HelperConfig is Script, CodeConstants, VRFCoordinatorV2_5Mock {
     }
     mapping(uint => NetworkConfig) internal networks;
     NetworkConfig internal localNetworkConfig;
+    VRFCoordinatorV2_5Mock private immutable i_vrfMock;
 
     error unsupportedChain(uint256);
 
@@ -35,6 +36,13 @@ contract HelperConfig is Script, CodeConstants, VRFCoordinatorV2_5Mock {
         VRFCoordinatorV2_5Mock(MOCK_BASE_FEE, MOCK_GAS_PRICE, MOCK_WEI_PER_LINK)
     {
         networks[SEPOLIA_CHAIN_ID] = getSepoliaConfig();
+        vm.startBroadcast();
+        i_vrfMock = new VRFCoordinatorV2_5Mock(
+            MOCK_BASE_FEE,
+            MOCK_GAS_PRICE,
+            MOCK_WEI_PER_LINK
+        );
+        vm.stopBroadcast();
     }
 
     function getSepoliaConfig() internal view returns (NetworkConfig memory) {
@@ -58,23 +66,15 @@ contract HelperConfig is Script, CodeConstants, VRFCoordinatorV2_5Mock {
             return localNetworkConfig;
         }
 
-        vm.startBroadcast();
-        VRFCoordinatorV2_5Mock mock = new VRFCoordinatorV2_5Mock(
-            MOCK_BASE_FEE,
-            MOCK_GAS_PRICE,
-            MOCK_WEI_PER_LINK
-        );
-        vm.stopBroadcast();
-
         return
             localNetworkConfig = NetworkConfig({
-                vrfCoordinator: address(mock),
+                vrfCoordinator: address(i_vrfMock),
                 entranceFee: 0.01 ether,
                 cooldownPeriod: 60,
                 keyHash: vm.envBytes32("SEPOLIA_VRF_KEY_HASH"),
                 callbackGasLimit: 500000,
                 requestConfirmations: 3,
-                subscriptionId: vm.envUint("SEPOLIA_VRF_SUBSCRIPTION_ID"),
+                subscriptionId: 0,
                 ethToUsdDataFeedProxy: vm.envAddress(
                     "SEPOLIA_ETH_TO_USD_DATA_FEED_PROXY"
                 )

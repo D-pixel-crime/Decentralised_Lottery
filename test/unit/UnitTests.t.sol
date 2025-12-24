@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Raffle} from "src/Raffle.sol";
 import {DeployRaffle} from "script/DeployRaffle.s.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
@@ -12,9 +12,6 @@ contract UnitTests is Test {
     address player = makeAddr("user");
     uint256 startFund = 10 ether;
 
-    /**  @dev Raffle Errors */
-    error notEnoughEntranceFee(address, uint256, uint256);
-
     /**  @dev Raffle Events */
     event newPlayerAdded(address, address);
 
@@ -23,10 +20,17 @@ contract UnitTests is Test {
         startHoax(player, startFund);
     }
 
-    /** @dev Testing two variables is enough */
+    /** @dev Testing some variables is enough */
     function test_stateVariablesAreSetOrNot() public view {
         vm.assertEq(raffleContract.getEntranceFee(), config.entranceFee);
         vm.assertEq(raffleContract.getCooldownPeriod(), config.cooldownPeriod);
+        vm.assertTrue(
+            raffleContract.getRaffleState() == Raffle.RaffleState.IDLE
+        );
+    }
+
+    function test_ownerSetProperly() public view {
+        vm.assertEq(raffleContract.getOwner(), msg.sender);
     }
 
     function test_raffleEntry() public {
@@ -34,7 +38,7 @@ contract UnitTests is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                notEnoughEntranceFee.selector,
+                Raffle.notEnoughEntranceFee.selector,
                 address(raffleContract),
                 fundVal,
                 config.entranceFee
@@ -54,7 +58,57 @@ contract UnitTests is Test {
         (uint256 afterPlayer, uint256 afterReward) = raffleContract
             .getTotalPlayersAndRewardMoney();
 
-        vm.assertTrue(beforePlayer + 1 == afterPlayer);
-        vm.assertTrue(beforeReward + fundVal == afterReward);
+        assert(beforePlayer + 1 == afterPlayer);
+        assert(beforeReward + fundVal == afterReward);
+    }
+
+    function test_stateVariablesUpdationReverts() public {
+        uint32 newCallbackGasLimit = 3500000;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Raffle.aboveAllowedGasLimitOf_2_500_000.selector,
+                address(raffleContract),
+                newCallbackGasLimit
+            )
+        );
+        raffleContract.updateCallbackGasLimit(3500000);
+
+        uint16 newAllowedConfirmationsLimit = 1;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Raffle.notInAllowedConfirmationsLimitsOf_3_and_200.selector,
+                address(raffleContract),
+                newAllowedConfirmationsLimit
+            )
+        );
+        raffleContract.updateRequestConfirmations(newAllowedConfirmationsLimit);
+
+        newAllowedConfirmationsLimit = 500;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Raffle.notInAllowedConfirmationsLimitsOf_3_and_200.selector,
+                address(raffleContract),
+                newAllowedConfirmationsLimit
+            )
+        );
+        raffleContract.updateRequestConfirmations(newAllowedConfirmationsLimit);
+    }
+
+    function test_entranceErrorWhileRaffleBusy() public {
+        raffleContract.enterRaffle{value: 2 ether}();
+        vm.warp(block.timestamp + raffleContract.getCooldownPeriod() + 1);
+        vm.roll(block.number + 1);
+
+        raffleContract.performUpkeep("");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Raffle.lotterySystemBusy.selector,
+                address(raffleContract),
+                block.timestamp
+            )
+        );
+        startHoax(makeAddr("newPlayer"), startFund);
+        raffleContract.enterRaffle{value: 2 ether}();
     }
 }
