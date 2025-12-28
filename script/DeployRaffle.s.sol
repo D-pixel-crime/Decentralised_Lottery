@@ -14,7 +14,6 @@ contract DeployRaffle is Script, CodeConstants {
     {
         HelperConfig hc = new HelperConfig();
         HelperConfig.NetworkConfig memory config = hc.getChainConfig();
-        LinkToken i_linkMock = new LinkToken();
         uint256 FUND_AMOUNT = 4 ether;
 
         if (config.subscriptionId == 0) {
@@ -33,7 +32,7 @@ contract DeployRaffle is Script, CodeConstants {
                 vm.stopBroadcast();
             } else {
                 vm.startBroadcast();
-                LinkToken(i_linkMock).transferAndCall(
+                LinkToken(config.linkMock).transferAndCall(
                     config.vrfCoordinator,
                     FUND_AMOUNT,
                     abi.encode(config.subscriptionId)

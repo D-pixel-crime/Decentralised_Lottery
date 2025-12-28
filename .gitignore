@@ -17,6 +17,7 @@ docs/
 # Ignore Library Files
 /lib
 lib/
+./lib
 
 # Extras
 /zkout

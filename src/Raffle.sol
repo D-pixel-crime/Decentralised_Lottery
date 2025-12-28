@@ -46,6 +46,7 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
     // Events
     event newPlayerAdded(address, address);
     event newWinnerRewarded(address, address, uint256, uint256);
+    event requestedRequestId(uint256 indexed);
 
     constructor(
         address vrfCoordinator,
@@ -98,6 +99,8 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
                 )
             })
         );
+
+        emit requestedRequestId(requestId);
     }
 
     function enterRaffle() public payable {
@@ -132,9 +135,6 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
         uint256[] calldata randomWords
     ) internal override nonReentrant {
         uint256 len = s_players.length;
-        if (s_currRaffleState == RaffleState.BUSY) {
-            revert lotterySystemBusy(address(this), block.timestamp);
-        }
 
         address payable winner = s_players[randomWords[0] % len];
         uint256 winningAmount = address(this).balance;
@@ -217,6 +217,10 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
 
     function getRaffleState() public view returns (RaffleState) {
         return s_currRaffleState;
+    }
+
+    function getLastTimestamp() public view returns (uint256) {
+        return s_lastTimestamp;
     }
 
     function getOwner() public view returns (address) {

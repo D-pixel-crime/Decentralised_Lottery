@@ -2,11 +2,12 @@
 pragma solidity ^0.8.0;
 
 import {Script} from "forge-std/Script.sol";
+import {LinkToken} from "test/mocks/LinkToken.sol";
 import {VRFCoordinatorV2_5Mock} from "chainlink-vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
 abstract contract CodeConstants {
     /** @dev VRF-Mock Constants */
-    uint96 public constant MOCK_BASE_FEE = 0.25 ether;
+    uint96 public constant MOCK_BASE_FEE = 0.025 ether;
     uint96 public constant MOCK_GAS_PRICE = 1e9;
     int256 public constant MOCK_WEI_PER_LINK = 4e15;
 
@@ -15,7 +16,7 @@ abstract contract CodeConstants {
     uint256 public constant LOCAL_CHAIN_ID = 31337;
 }
 
-contract HelperConfig is Script, CodeConstants, VRFCoordinatorV2_5Mock {
+contract HelperConfig is Script, CodeConstants {
     struct NetworkConfig {
         address vrfCoordinator;
         uint256 entranceFee;
@@ -25,18 +26,19 @@ contract HelperConfig is Script, CodeConstants, VRFCoordinatorV2_5Mock {
         uint16 requestConfirmations;
         uint256 subscriptionId;
         address ethToUsdDataFeedProxy;
+        address linkMock;
     }
     mapping(uint => NetworkConfig) internal networks;
     NetworkConfig internal localNetworkConfig;
     VRFCoordinatorV2_5Mock private immutable i_vrfMock;
+    LinkToken private immutable i_linkMock;
 
     error unsupportedChain(uint256);
 
-    constructor()
-        VRFCoordinatorV2_5Mock(MOCK_BASE_FEE, MOCK_GAS_PRICE, MOCK_WEI_PER_LINK)
-    {
+    constructor() {
         networks[SEPOLIA_CHAIN_ID] = getSepoliaConfig();
         vm.startBroadcast();
+        i_linkMock = new LinkToken();
         i_vrfMock = new VRFCoordinatorV2_5Mock(
             MOCK_BASE_FEE,
             MOCK_GAS_PRICE,
@@ -57,7 +59,8 @@ contract HelperConfig is Script, CodeConstants, VRFCoordinatorV2_5Mock {
                 subscriptionId: vm.envUint("SEPOLIA_VRF_SUBSCRIPTION_ID"),
                 ethToUsdDataFeedProxy: vm.envAddress(
                     "SEPOLIA_ETH_TO_USD_DATA_FEED_PROXY"
-                )
+                ),
+                linkMock: address(i_linkMock)
             });
     }
 
@@ -77,7 +80,8 @@ contract HelperConfig is Script, CodeConstants, VRFCoordinatorV2_5Mock {
                 subscriptionId: 0,
                 ethToUsdDataFeedProxy: vm.envAddress(
                     "SEPOLIA_ETH_TO_USD_DATA_FEED_PROXY"
-                )
+                ),
+                linkMock: address(i_linkMock)
             });
     }
 
