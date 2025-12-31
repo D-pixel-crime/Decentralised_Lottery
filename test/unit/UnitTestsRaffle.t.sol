@@ -8,14 +8,11 @@ import {HelperConfig} from "script/HelperConfig.s.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {VRFCoordinatorV2_5Mock} from "chainlink-vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
-contract UnitTests is Test {
+contract UnitTestsRaffle is Test {
     Raffle raffleContract;
     HelperConfig.NetworkConfig config;
     address player = makeAddr("user");
     uint256 startFund = 10 ether;
-
-    /**  @dev Raffle Events */
-    event newPlayerAdded(address, address);
 
     function setUp() external {
         (raffleContract, config) = (new DeployRaffle()).run();
@@ -35,9 +32,10 @@ contract UnitTests is Test {
         vm.assertEq(raffleContract.getOwner(), msg.sender);
     }
 
-    function test_raffleEntryRevertWithInsufficientFunds() public {
-        uint256 fundVal = 0.0001 ether;
-
+    function test_raffleEntryRevertWithInsufficientFundsFuzzTesting(
+        uint256 fundVal
+    ) public {
+        fundVal = bound(fundVal, 0, 0.01 ether - 1);
         vm.expectRevert(
             abi.encodeWithSelector(
                 Raffle.notEnoughEntranceFee.selector,
@@ -49,14 +47,18 @@ contract UnitTests is Test {
         raffleContract.enterRaffle{value: fundVal}();
     }
 
-    function test_raffleEntrySuccessAndEmits() public {
-        uint256 fundVal = 1 ether;
+    function test_raffleEntrySuccessAndEmitsFuzzTesting(
+        uint256 fundVal
+    ) public {
+        uint256 maxi = 1000 ether;
+        vm.deal(player, maxi);
+        fundVal = bound(fundVal, config.entranceFee, maxi);
 
         (uint256 beforePlayer, uint256 beforeReward) = raffleContract
             .getTotalPlayersAndRewardMoney();
 
         vm.expectEmit();
-        emit newPlayerAdded(address(raffleContract), address(player));
+        emit Raffle.newPlayerAdded(address(raffleContract), address(player));
         raffleContract.enterRaffle{value: fundVal}();
 
         (uint256 afterPlayer, uint256 afterReward) = raffleContract
@@ -66,8 +68,18 @@ contract UnitTests is Test {
         assert(beforeReward + fundVal == afterReward);
     }
 
-    function test_stateVariablesUpdationReverts() public {
-        uint32 newCallbackGasLimit = 3500000;
+    function test_stateVariablesUpdationRevertsFuzzTesting(
+        uint32 newCallbackGasLimit,
+        uint16 newAllowedConfirmationsLimit
+    ) public {
+        newCallbackGasLimit = uint32(
+            bound(newCallbackGasLimit, 2500001, 2 ** 32 - 1)
+        );
+        vm.assume(
+            newAllowedConfirmationsLimit < 3 ||
+                newAllowedConfirmationsLimit > 200
+        );
+
         vm.expectRevert(
             abi.encodeWithSelector(
                 Raffle.aboveAllowedGasLimitOf_2_500_000.selector,
@@ -75,19 +87,8 @@ contract UnitTests is Test {
                 newCallbackGasLimit
             )
         );
-        raffleContract.updateCallbackGasLimit(3500000);
+        raffleContract.updateCallbackGasLimit(newCallbackGasLimit);
 
-        uint16 newAllowedConfirmationsLimit = 1;
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Raffle.notInAllowedConfirmationsLimitsOf_3_and_200.selector,
-                address(raffleContract),
-                newAllowedConfirmationsLimit
-            )
-        );
-        raffleContract.updateRequestConfirmations(newAllowedConfirmationsLimit);
-
-        newAllowedConfirmationsLimit = 500;
         vm.expectRevert(
             abi.encodeWithSelector(
                 Raffle.notInAllowedConfirmationsLimitsOf_3_and_200.selector,
@@ -223,23 +224,36 @@ contract UnitTests is Test {
         );
     }
 
-    // function test_rewardingSystem() public {
-    //     raffleContract.enterRaffle{value: 2 ether}();
-    //     vm.warp(block.timestamp + raffleContract.getCooldownPeriod() + 1);
-    //     vm.roll(block.number + 1);
-    //     (, uint256 bal) = raffleContract.getTotalPlayersAndRewardMoney();
+    function test_fulfillRandomWordsRewardsWithAllConditionsPassed() public {
+        raffleContract.enterRaffle{value: 2 ether}();
+        vm.warp(block.timestamp + raffleContract.getCooldownPeriod() + 1);
+        vm.roll(block.number + 1);
+        (, uint256 bal) = raffleContract.getTotalPlayersAndRewardMoney();
 
-    //     uint256 reqId = raffleContract.performUpkeep("");
-    //     vm.expectEmit();
-    //     emit Raffle.newWinnerRewarded(
-    //         address(raffleContract),
-    //         address(player),
-    //         bal,
-    //         block.timestamp
-    //     );
-    //     VRFCoordinatorV2_5Mock(config.vrfCoordinator).fulfillRandomWords(
-    //         reqId,
-    //         address(raffleContract)
-    //     );
-    // }
+        uint256 reqId = raffleContract.performUpkeep("");
+        vm.expectEmit();
+        emit Raffle.newWinnerRewarded(
+            address(raffleContract),
+            address(player),
+            bal,
+            block.timestamp
+        );
+        vm.expectEmit(false, false, false, false);
+        emit VRFCoordinatorV2_5Mock.RandomWordsFulfilled(
+            0,
+            0,
+            0,
+            0,
+            false,
+            false,
+            false
+        );
+        VRFCoordinatorV2_5Mock(config.vrfCoordinator).fulfillRandomWords(
+            reqId,
+            address(raffleContract)
+        );
+
+        (, bal) = raffleContract.getTotalPlayersAndRewardMoney();
+        vm.assertEq(bal, 0);
+    }
 }

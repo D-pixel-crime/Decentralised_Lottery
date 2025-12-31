@@ -27,7 +27,7 @@ contract DeployRaffle is Script, CodeConstants {
                 vm.startBroadcast();
                 VRFCoordinatorV2_5Mock(config.vrfCoordinator).fundSubscription(
                     config.subscriptionId,
-                    FUND_AMOUNT
+                    FUND_AMOUNT * 100
                 );
                 vm.stopBroadcast();
             } else {

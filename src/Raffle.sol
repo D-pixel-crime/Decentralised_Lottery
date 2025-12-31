@@ -1,4 +1,4 @@
-// LPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import {AggregatorV3Interface} from "chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -171,6 +171,10 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
         s_subscriptionId = newSubscriptionId;
     }
 
+    function updateKeyHash(bytes32 newKeyHash) public {
+        s_keyHash = newKeyHash;
+    }
+
     function updateCallbackGasLimit(uint32 newCallbackGasLimit) public {
         if (newCallbackGasLimit > 2500000) {
             revert aboveAllowedGasLimitOf_2_500_000(
@@ -189,10 +193,6 @@ contract Raffle is VRFConsumerBaseV2Plus, ReentrancyGuard {
             );
         }
         s_requestConfirmations = newRequestConfirmations;
-    }
-
-    function updateKeyHash(bytes32 newKeyHash) public {
-        s_keyHash = newKeyHash;
     }
 
     /**
