@@ -4,15 +4,20 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {Raffle} from "src/Raffle.sol";
 import {DeployRaffle} from "script/DeployRaffle.s.sol";
-import {HelperConfig} from "script/HelperConfig.s.sol";
+import {HelperConfig, CodeConstants} from "script/HelperConfig.s.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {VRFCoordinatorV2_5Mock} from "chainlink-vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
-contract UnitTestsRaffle is Test {
+contract UnitTestsRaffle is Test, CodeConstants {
     Raffle raffleContract;
     HelperConfig.NetworkConfig config;
     address player = makeAddr("user");
     uint256 startFund = 10 ether;
+
+    modifier skipFork() {
+        if (block.chainid != LOCAL_CHAIN_ID) return;
+        _;
+    }
 
     function setUp() external {
         (raffleContract, config) = (new DeployRaffle()).run();
@@ -29,7 +34,7 @@ contract UnitTestsRaffle is Test {
     }
 
     function test_ownerSetProperly() public view {
-        vm.assertEq(raffleContract.getOwner(), msg.sender);
+        vm.assertEq(raffleContract.getOwner(), config.account);
     }
 
     function test_raffleEntryRevertWithInsufficientFundsFuzzTesting(
@@ -216,7 +221,7 @@ contract UnitTestsRaffle is Test {
     /** @dev Fuzz Testing 1000 times */
     function test_fulfillRandomWordsWorksOnlyAfterPerformUpkeepUsingFuzzyTest(
         uint256 randomRequestId
-    ) public {
+    ) public skipFork {
         vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
         VRFCoordinatorV2_5Mock(config.vrfCoordinator).fulfillRandomWords(
             randomRequestId,
@@ -224,7 +229,10 @@ contract UnitTestsRaffle is Test {
         );
     }
 
-    function test_fulfillRandomWordsRewardsWithAllConditionsPassed() public {
+    function test_fulfillRandomWordsRewardsWithAllConditionsPassed()
+        public
+        skipFork
+    {
         raffleContract.enterRaffle{value: 2 ether}();
         vm.warp(block.timestamp + raffleContract.getCooldownPeriod() + 1);
         vm.roll(block.number + 1);

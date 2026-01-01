@@ -27,24 +27,17 @@ contract HelperConfig is Script, CodeConstants {
         uint256 subscriptionId;
         address ethToUsdDataFeedProxy;
         address linkMock;
+        address account;
     }
     mapping(uint => NetworkConfig) internal networks;
     NetworkConfig internal localNetworkConfig;
-    VRFCoordinatorV2_5Mock private immutable i_vrfMock;
-    LinkToken private immutable i_linkMock;
+    VRFCoordinatorV2_5Mock private vrfMock;
+    LinkToken private linkMock;
 
     error unsupportedChain(uint256);
 
     constructor() {
         networks[SEPOLIA_CHAIN_ID] = getSepoliaConfig();
-        vm.startBroadcast();
-        i_linkMock = new LinkToken();
-        i_vrfMock = new VRFCoordinatorV2_5Mock(
-            MOCK_BASE_FEE,
-            MOCK_GAS_PRICE,
-            MOCK_WEI_PER_LINK
-        );
-        vm.stopBroadcast();
     }
 
     function getSepoliaConfig() internal view returns (NetworkConfig memory) {
@@ -60,7 +53,8 @@ contract HelperConfig is Script, CodeConstants {
                 ethToUsdDataFeedProxy: vm.envAddress(
                     "SEPOLIA_ETH_TO_USD_DATA_FEED_PROXY"
                 ),
-                linkMock: address(i_linkMock)
+                linkMock: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
+                account: vm.envAddress("SEPOLIA_ACCOUNT_ADDRESS")
             });
     }
 
@@ -69,19 +63,29 @@ contract HelperConfig is Script, CodeConstants {
             return localNetworkConfig;
         }
 
+        vm.startBroadcast();
+        linkMock = new LinkToken();
+        vrfMock = new VRFCoordinatorV2_5Mock(
+            MOCK_BASE_FEE,
+            MOCK_GAS_PRICE,
+            MOCK_WEI_PER_LINK
+        );
+        uint256 subId = vrfMock.createSubscription();
+        vrfMock.fundSubscription(subId, 1000 ether);
+        vm.stopBroadcast();
+
         return
             localNetworkConfig = NetworkConfig({
-                vrfCoordinator: address(i_vrfMock),
+                vrfCoordinator: address(vrfMock),
                 entranceFee: 0.01 ether,
                 cooldownPeriod: 60,
-                keyHash: vm.envBytes32("SEPOLIA_VRF_KEY_HASH"),
+                keyHash: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
                 callbackGasLimit: 500000,
                 requestConfirmations: 3,
-                subscriptionId: 0,
-                ethToUsdDataFeedProxy: vm.envAddress(
-                    "SEPOLIA_ETH_TO_USD_DATA_FEED_PROXY"
-                ),
-                linkMock: address(i_linkMock)
+                subscriptionId: subId,
+                ethToUsdDataFeedProxy: address(0),
+                linkMock: address(linkMock),
+                account: 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38
             });
     }
 

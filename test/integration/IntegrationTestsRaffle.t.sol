@@ -4,21 +4,28 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {Raffle} from "src/Raffle.sol";
 import {DeployRaffle} from "script/DeployRaffle.s.sol";
-import {HelperConfig} from "script/HelperConfig.s.sol";
+import {HelperConfig, CodeConstants} from "script/HelperConfig.s.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {VRFCoordinatorV2_5Mock} from "chainlink-vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
-contract IntegrationTestsRaffle is Test {
+contract IntegrationTestsRaffle is Test, CodeConstants {
     Raffle raffleContract;
     HelperConfig.NetworkConfig config;
     address payable[] allPlayers;
     uint256 startingAmount = 10 ether;
 
+    modifier skipFork() {
+        if (block.chainid != LOCAL_CHAIN_ID) return;
+        _;
+    }
+
     function setUp() external {
         (raffleContract, config) = (new DeployRaffle()).run();
     }
 
-    function test_fullRaffleCycleFuzzyTesting(uint8 totalPlayers) public {
+    function test_fullRaffleCycleFuzzyTesting(
+        uint8 totalPlayers
+    ) public skipFork {
         totalPlayers = uint8(bound(totalPlayers, 1, 2 ** 8 - 1));
         uint256 fundAmount = 2 ether;
         for (uint16 i = 0; i <= totalPlayers; i++) {

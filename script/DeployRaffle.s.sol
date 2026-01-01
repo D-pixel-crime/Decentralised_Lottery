@@ -17,7 +17,7 @@ contract DeployRaffle is Script, CodeConstants {
         uint256 FUND_AMOUNT = 4 ether;
 
         if (config.subscriptionId == 0) {
-            vm.startBroadcast();
+            vm.startBroadcast(config.account);
             config.subscriptionId = VRFCoordinatorV2_5Mock(
                 config.vrfCoordinator
             ).createSubscription();
@@ -31,7 +31,7 @@ contract DeployRaffle is Script, CodeConstants {
                 );
                 vm.stopBroadcast();
             } else {
-                vm.startBroadcast();
+                vm.startBroadcast(config.account);
                 LinkToken(config.linkMock).transferAndCall(
                     config.vrfCoordinator,
                     FUND_AMOUNT,
@@ -41,7 +41,7 @@ contract DeployRaffle is Script, CodeConstants {
             }
         }
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.account);
         Raffle raffleContract = new Raffle(
             config.vrfCoordinator,
             config.entranceFee,
