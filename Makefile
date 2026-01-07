@@ -19,6 +19,8 @@ test_and_deploy-anvil: test-anvil deploy-anvil
 
 test_and_deploy-sepolia: test-sepolia deploy-sepolia
 
+fork_test_and_deploy-sepolia: test-sepolia fork_deploy-sepolia
+
 test-anvil:
 	@forge test
 
@@ -30,3 +32,6 @@ deploy-anvil:
 
 deploy-sepolia:
 	@forge script script/DeployRaffle.s.sol --account testnet_account $(BROADCAST_FLAG) --rpc-url $(SEPOLIA_RPC_URL) $(VERIFY_FLAG)
+
+fork_deploy-sepolia:
+	@forge script script/DeployRaffle.s.sol --account testnet_account --fork-url $(SEPOLIA_RPC_URL)
