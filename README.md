@@ -37,8 +37,8 @@ It features extensive **Fuzz Testing**, **Unit/Integration Testing**, and **Depl
 ```mermaid
 flowchart TD
     User[Participant] -->|Enter with ETH| Raffle[Raffle Contract]
-    Check[Chainlink Automation] -->|Check Upkeep (Time Passed?)| Raffle
-    Raffle -->|Perform Upkeep (Request Randomness)| VRF[Chainlink VRF Coordinator]
+    Check[Chainlink Automation] -->|"Check Upkeep (Time Passed?)"| Raffle
+    Raffle -->|"Perform Upkeep (Request Randomness)"| VRF[Chainlink VRF Coordinator]
     VRF -->|Fulfill Random Words| Raffle
     Raffle -->|Pick Winner & Send Balance| Winner[Winner Address]
     Raffle -->|Reset| Raffle
