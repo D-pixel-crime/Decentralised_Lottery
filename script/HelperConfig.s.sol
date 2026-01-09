@@ -94,9 +94,17 @@ contract HelperConfig is Script, CodeConstants {
     ) public returns (NetworkConfig memory) {
         if (networks[chainId].vrfCoordinator != address(0)) {
             return networks[chainId];
-        } else if (chainId == LOCAL_CHAIN_ID) {
+        }
+
+        if (chainId == LOCAL_CHAIN_ID) {
             return getAnvilConfig();
-        } else revert unsupportedChain(block.chainid);
+        }
+
+        if (chainId == SEPOLIA_CHAIN_ID) {
+            return networks[SEPOLIA_CHAIN_ID] = getSepoliaConfig();
+        }
+
+        revert unsupportedChain(chainId);
     }
 
     function getChainConfig() public returns (NetworkConfig memory) {

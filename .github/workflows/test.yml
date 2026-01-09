@@ -1,4 +1,4 @@
-name: CI
+name: Raffle Foundry CI
 
 permissions: {}
 
@@ -12,7 +12,7 @@ env:
 
 jobs:
   check:
-    name: Foundry project
+    name: Foundry Raffle project
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,7 +29,7 @@ jobs:
         run: forge install
 
       - name: Run Forge build
-        run: forge build
+        run: forge build --sizes
 
       - name: Run Forge tests
         run: forge test
