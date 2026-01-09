@@ -36,9 +36,7 @@ contract HelperConfig is Script, CodeConstants {
 
     error unsupportedChain(uint256);
 
-    constructor() {
-        networks[SEPOLIA_CHAIN_ID] = getSepoliaConfig();
-    }
+    constructor() {}
 
     function getSepoliaConfig() internal view returns (NetworkConfig memory) {
         return
